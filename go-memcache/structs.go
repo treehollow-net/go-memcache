@@ -6,3 +6,7 @@ type Item struct {
 	Expiration int32
 	CreatedAt  int64
 }
+
+func (i *Item) IsExpired() bool {
+	return isExpired(i.CreatedAt, i.Expiration)
+}

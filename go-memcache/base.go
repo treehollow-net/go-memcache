@@ -1,11 +1,23 @@
 package go_memcache
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type MemCache struct {
 	sync.RWMutex // for control concurrency
 	Items        map[string]*Item
 	GCInterval   int32 // Garbage Collection
+}
+
+func New(GCInterval int32) *MemCache {
+	m := &MemCache{
+		Items:      make(map[string]*Item),
+		GCInterval: GCInterval,
+	}
+	go m.GC()
+	return m
 }
 
 func (m *MemCache) Remove(key string) {
@@ -49,4 +61,25 @@ func (m *MemCache) Contains(key string) bool {
 	_, isOk := m.Items[key]
 	m.RUnlock()
 	return isOk
+}
+
+func (m *MemCache) GC() {
+	for {
+		select {
+		case <-time.After(time.Duration(m.GCInterval) * time.Second):
+			var keys []string
+
+			m.Lock()
+			for key, item := range m.Items {
+				if item.IsExpired() {
+					keys = append(keys, key)
+				}
+			}
+
+			for _, key := range keys {
+				m.Remove(key)
+			}
+			m.Unlock()
+		}
+	}
 }
