@@ -16,7 +16,15 @@ func New(GCInterval int32) *MemCache {
 		Items:      make(map[string]*Item),
 		GCInterval: GCInterval,
 	}
-	go m.GC()
+	go m.startGC()
+	return m
+}
+
+func NewWithoutGC() *MemCache {
+	m := &MemCache{
+		Items:      make(map[string]*Item),
+		GCInterval: 0,
+	}
 	return m
 }
 
@@ -63,23 +71,27 @@ func (m *MemCache) Contains(key string) bool {
 	return isOk
 }
 
-func (m *MemCache) GC() {
+func (m *MemCache) startGC() {
 	for {
 		select {
 		case <-time.After(time.Duration(m.GCInterval) * time.Second):
-			var keys []string
-
-			m.Lock()
-			for key, item := range m.Items {
-				if item.IsExpired() {
-					keys = append(keys, key)
-				}
-			}
-
-			for _, key := range keys {
-				m.Remove(key)
-			}
-			m.Unlock()
+			m.GC()
 		}
 	}
+}
+
+func (m *MemCache) GC() {
+	var keys []string
+
+	m.Lock()
+	for key, item := range m.Items {
+		if item.IsExpired() {
+			keys = append(keys, key)
+		}
+	}
+
+	for _, key := range keys {
+		m.Remove(key)
+	}
+	m.Unlock()
 }
